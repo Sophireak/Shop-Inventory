@@ -1,0 +1,107 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// PRODUCTS (Your inventory items)
+// ============================================
+model Product {
+  id           Int      @id @default(autoincrement())
+  name         String
+  size         String?
+  category     String
+  style        String?  // "pocket", "no-pocket", or color like "blue", "orange", "green"
+  sellPrice    Int
+  costPrice    Int
+  currentStock Int      @default(0)
+  minStock     Int      @default(5)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stockIns     StockIn[]
+  saleItems    SaleItem[]
+  stockChecks  StockCheck[]
+
+  @@unique([name, size, style])
+}
+
+// ============================================
+// STOCK IN (When supplier delivers)
+// ============================================
+model StockIn {
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id])
+  quantity   Int
+  costPrice  Int      // cost at time of purchase
+  totalCost  Int      // quantity * costPrice
+  supplier   String?
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+// ============================================
+// DAILY SALES (One record per day)
+// ============================================
+model DailySale {
+  id            Int        @id @default(autoincrement())
+  date          DateTime   @unique  // one entry per day
+  totalItems    Int        @default(0)
+  totalRevenue  Int        @default(0)
+  totalCost     Int        @default(0)
+  totalProfit   Int        @default(0)
+  cashCounted   Int?       // optional: actual cash in box
+  cashDifference Int?      // difference between expected & actual
+  note          String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  items         SaleItem[]
+}
+
+// ============================================
+// SALE ITEMS (Each product sold that day)
+// ============================================
+model SaleItem {
+  id          Int       @id @default(autoincrement())
+  dailySaleId Int
+  dailySale   DailySale @relation(fields: [dailySaleId], references: [id], onDelete: Cascade)
+  productId   Int
+  product     Product   @relation(fields: [productId], references: [id])
+  quantity    Int
+  sellPrice   Int       // price at time of sale
+  subtotal    Int       // quantity * sellPrice
+}
+
+// ============================================
+// STOCK CHECK (Physical count vs expected)
+// ============================================
+model StockCheck {
+  id             Int      @id @default(autoincrement())
+  productId      Int
+  product        Product  @relation(fields: [productId], references: [id])
+  expectedStock  Int      // what app says should be there
+  actualStock    Int      // what you counted
+  difference     Int      // actual - expected (negative = loss)
+  lossValue      Int      // difference * sellPrice (for losses)
+  reason         String?  // "damaged", "stolen", "miscount", etc.
+  note           String?
+  createdAt      DateTime @default(now())
+}
+
+// ============================================
+// SETTINGS (App settings)
+// ============================================
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
